@@ -5,27 +5,32 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class ChatServer {
+public class ChatServer implements Runnable{
 
     private ArrayList<ClientHandler> clients;
+    private ServerSocket serverSocket;
+    private ExecutorService pool;
 
     public ChatServer() {
         clients = new ArrayList<>();
     }
 
-    public void start(int port) {
-        
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Chat Server started on port " + port);
+    @Override
+    public void run() {
 
+        try {
+            serverSocket = new ServerSocket(1999);
+            pool = Executors.newCachedThreadPool();
+            System.out.println("Chat Server active");
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("New client connected: " + clientSocket.getInetAddress().getHostAddress());
-
+                //System.out.println("New client connected: " + clientSocket.getInetAddress().getHostAddress());
                 ClientHandler clientHandler = new ClientHandler(clientSocket);
                 clients.add(clientHandler);
-                clientHandler.start();
+                pool.execute(clientHandler);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -38,52 +43,42 @@ public class ChatServer {
         }
     }
 
-    private class ClientHandler extends Thread {
+    class ClientHandler implements Runnable {
 
-        private Socket clientSocket;
-        private BufferedReader reader;
-        private PrintWriter writer;
+        private Socket socket;
+        private BufferedReader in;
+        private PrintWriter out;
+        private String username;
 
-        public ClientHandler(Socket socket) {
-            clientSocket = socket;
-            try {
-                reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                writer = new PrintWriter(clientSocket.getOutputStream(), true);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        public ClientHandler(Socket socket){
+            this.socket = socket;
         }
 
+        @Override
         public void run() {
-            String message;
-
             try {
-                while ((message = reader.readLine()) != null) {
-                    System.out.println( "Received message: " + message);
-                    broadcastMessage(message);
+                out = new PrintWriter(socket.getOutputStream(), true);
+                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));                
+                out.println("Pick your username: ");
+                username = in.readLine();
+                System.out.println(username + " connected!");
+                broadcastMessage(username + " joined the chat!");
+                String message;
+                while ((message = in.readLine()) != null) {
+                    broadcastMessage(username + ": " + message);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
-            } finally {
-                try {
-                    reader.close();
-                    writer.close();
-                    clientSocket.close();
-                    clients.remove(this);
-                    System.out.println("Client disconnected");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+            } 
         }
 
         public void sendMessage(String message) {
-            writer.println(message);
+            out.println(message);
         }
     }
 
     public static void main(String[] args) {
         ChatServer chatServer = new ChatServer();
-        chatServer.start(1999);
+        chatServer.run();
     }
 }

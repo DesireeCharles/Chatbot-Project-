@@ -9,43 +9,50 @@ class ChatClient implements Runnable {
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
-    private BufferedReader console;
 
-    public void start(){
+    @Override
+    public void run(){
 
         try{
             clientSocket = new Socket("localhost", 1999);
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            console = new BufferedReader(new InputStreamReader(System.in));
             System.out.print("Connection to server successful!\n");
-    
-            Thread writeToSocket = new Thread(this, "WriterThread");
+
+            InputHandler inHandler = new InputHandler();
+            Thread writeToSocket = new Thread(inHandler);
             writeToSocket.start();
     
             String messageIn;
             while ((messageIn = in.readLine()) != null) {
-                System.out.println("Received: " + messageIn);
+                System.out.println(messageIn);
             }
         } catch(IOException e){
             e.printStackTrace();
         }        
     }
 
-    @Override
-    public void run() {
-        String input;
-        try {
-            while ((input = console.readLine()) != null) {
-                out.println(input);
+    class InputHandler implements Runnable {
+
+        @Override
+        public void run(){
+            
+            try{
+                BufferedReader inReader = new BufferedReader(new InputStreamReader(System.in));
+                while (true){
+                    String message = inReader.readLine();
+                    out.println(message);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
+
     }
+
 
     public static void main(String[] args) {
         ChatClient chatClient = new ChatClient();
-        chatClient.start();
+        chatClient.run();
     }
 }
