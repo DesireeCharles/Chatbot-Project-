@@ -9,6 +9,7 @@ class ChatClient implements Runnable {
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
+    private boolean done;
 
     @Override
     public void run(){
@@ -28,23 +29,34 @@ class ChatClient implements Runnable {
                 System.out.println(messageIn);
             }
         } catch(IOException e){
-            e.printStackTrace();
+            shutdown();
         }        
+    }
+
+    public void shutdown(){
+        done = true;
+        try{
+            in.close();
+            out.close();
+            if (!clientSocket.isClosed()){
+                clientSocket.close();
+            }
+        } catch (IOException e) {shutdown();}
     }
 
     class InputHandler implements Runnable {
 
         @Override
         public void run(){
-            
+
             try{
                 BufferedReader inReader = new BufferedReader(new InputStreamReader(System.in));
-                while (true){
+                while (!done){
                     String message = inReader.readLine();
                     out.println(message);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                shutdown();
             }
         }
 

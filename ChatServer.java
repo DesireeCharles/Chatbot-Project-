@@ -13,9 +13,11 @@ public class ChatServer implements Runnable{
     private ArrayList<ClientHandler> clients;
     private ServerSocket serverSocket;
     private ExecutorService pool;
+    private boolean done;
 
     public ChatServer() {
         clients = new ArrayList<>();
+        done = false;
     }
 
     @Override
@@ -25,7 +27,7 @@ public class ChatServer implements Runnable{
             serverSocket = new ServerSocket(1999);
             pool = Executors.newCachedThreadPool();
             System.out.println("Chat Server active");
-            while (true) {
+            while (!done) {
                 Socket clientSocket = serverSocket.accept();
                 //System.out.println("New client connected: " + clientSocket.getInetAddress().getHostAddress());
                 ClientHandler clientHandler = new ClientHandler(clientSocket);
@@ -33,13 +35,30 @@ public class ChatServer implements Runnable{
                 pool.execute(clientHandler);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            shutdown();
         }
     }
 
     public void broadcastMessage(String message) {
         for (ClientHandler client : clients) {
-            client.sendMessage(message);
+            if (client != null){
+                client.sendMessage(message);
+            }
+        }
+    }
+
+    public void shutdown(){
+        try{
+            done = true;
+            pool.shutdown();
+            if (!serverSocket.isClosed()){
+                serverSocket.close();
+            }
+            for (ClientHandler client: clients){
+                client.shutdown();
+            }
+        } catch (IOException e) {
+            shutdown();
         }
     }
 
@@ -68,12 +87,22 @@ public class ChatServer implements Runnable{
                     broadcastMessage(username + ": " + message);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                shutdown();
             } 
         }
 
         public void sendMessage(String message) {
             out.println(message);
+        }
+
+        public void shutdown(){
+            try{
+                in.close();
+                out.close();
+                if (!socket.isClosed()){
+                    socket.close();
+                }
+            } catch (IOException e){shutdown();}
         }
     }
 
